@@ -635,6 +635,9 @@
             capturePhotoBtn.disabled = true;
             imagePreview.src = '';
             analysisOutput.innerHTML = `<p class="font-medium text-gray-700">Analysis will appear here after capture.</p>`;
+            
+            // NEW: Clear the context text box
+            userContext.value = ''; 
         });
 
         // Initial setup
