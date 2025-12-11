@@ -27,6 +27,15 @@
 
         <!-- 1. Camera & Capture Section -->
         <div id="camera-section" class="flex flex-col items-center">
+            
+            <!-- NEW: Context Input Field -->
+            <div class="w-full mb-4">
+                <label for="user-context" class="block text-sm font-semibold text-gray-800 mb-1">
+                    Additional Context for AI:
+                </label>
+                <textarea id="user-context" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="e.g., 'Check the condition of the fire hose coupling,' or 'This area needs better lighting.'"></textarea>
+            </div>
+            
             <!-- Video feed and Canvas for capture -->
             <div class="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden border-2 border-gray-300 mb-4">
                 <video id="video-feed" class="w-full h-full object-cover" autoplay muted playsinline></video>
@@ -182,6 +191,8 @@
         const resultsSection = document.getElementById('results-section');
         const retakePhotoBtn = document.getElementById('retake-photo');
         const emailHistoryBtn = document.getElementById('email-history-btn');
+        // NEW: Context field element
+        const userContext = document.getElementById('user-context'); 
 
         let videoStream = null;
 
@@ -291,6 +302,9 @@
             // Convert canvas content to base64 JPEG
             const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.8);
             const base64Image = dataUrl.split(',')[1];
+            
+            // NEW: Get additional context from the textarea
+            const additionalContext = userContext.value.trim();
 
             // Update UI
             stopCamera();
@@ -299,8 +313,8 @@
             resultsSection.classList.remove('hidden');
             analysisOutput.innerHTML = `<p class="font-medium text-gray-700">Image captured. Starting analysis...</p>`;
 
-            // Send to LLM for analysis
-            analyzeImage(base64Image, dataUrl);
+            // Send to LLM for analysis, including context
+            analyzeImage(base64Image, dataUrl, additionalContext);
         }
 
         // 4. Gemini API Interaction (Reverting to direct client-side call)
@@ -339,16 +353,17 @@
             }
         }
 
-        async function analyzeImage(base64Image, dataUrl) {
+        // UPDATED: Function accepts additionalContext
+        async function analyzeImage(base64Image, dataUrl, additionalContext = "") {
             
-            // --- NEW CHECK ---
+            // --- API Key Check ---
             if (!apiKey) {
                  console.error("Gemini API key is missing. Please set the apiKey variable in index.html.");
                  analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">Authentication Error: Gemini API key is missing. Please paste your key into the 'apiKey' variable in the source code.</div>`;
                  loadingIndicator.classList.add('hidden');
                  return;
             }
-            // --- END NEW CHECK ---
+            // --- End API Key Check ---
 
             loadingIndicator.classList.remove('hidden');
             analysisOutput.innerHTML = '';
@@ -374,7 +389,11 @@
             3.  **Recommendations:** General best practices or maintenance recommendations.`;
 
 
-            const userQuery = "Analyze this image for any deficiencies that would warrant a Coast Guard Form 835, focusing on 46 CFR Subchapter I (MODUs).";
+            // UPDATED: Append user context to the user query
+            let userQuery = "Analyze this image for any deficiencies that would warrant a Coast Guard Form 835, focusing on 46 CFR Subchapter I (MODUs).";
+            if (additionalContext) {
+                userQuery += ` **ADDITIONAL USER CONTEXT:** ${additionalContext}`;
+            }
 
             const payload = {
                 contents: [
