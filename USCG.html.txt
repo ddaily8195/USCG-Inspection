@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coast Guard Inspection Analyst</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 bg-gray-50">
+
+    <header class="w-full max-w-2xl text-center mb-6">
+        <h1 class="text-3xl font-extrabold text-blue-900 border-b-2 border-blue-200 pb-2">USCG Deficiency (Form 835) Analyst</h1>
+        <p class="mt-2 text-gray-600">Analyze images for potential non-conformities against 46 CFR 107/108/109 (MODUs).</p>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="w-full max-w-2xl bg-white shadow-xl rounded-xl p-6">
+
+        <!-- 1. Camera & Capture Section -->
+        <div id="camera-section" class="flex flex-col items-center">
+            <!-- Video feed and Canvas for capture -->
+            <div class="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden border-2 border-gray-300 mb-4">
+                <video id="video-feed" class="w-full h-full object-cover" autoplay muted playsinline></video>
+                <canvas id="capture-canvas" class="hidden"></canvas>
+            </div>
+
+            <div class="flex space-x-4 mb-6">
+                <button id="start-camera" class="bg-blue-600 text-white px-6 py-3 rounded-full font-semibold shadow-md hover:bg-blue-700 transition duration-150 active:scale-95">
+                    Start Camera
+                </button>
+                <button id="capture-photo" class="bg-green-600 text-white px-6 py-3 rounded-full font-semibold shadow-md hover:bg-green-700 transition duration-150 active:scale-95 opacity-50 cursor-not-allowed" disabled>
+                    Capture Photo
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Preview and Results Section -->
+        <div id="results-section" class="hidden">
+            <h2 class="text-xl font-bold text-blue-800 mb-3 border-b pb-1">Current Analysis</h2>
+
+            <!-- Image Preview -->
+            <div class="w-full flex justify-center mb-4">
+                <img id="image-preview" class="max-h-64 object-contain rounded-lg shadow-inner border border-gray-200" alt="Captured Image Preview">
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="hidden text-center p-4 text-gray-600">
+                <div class="flex justify-center items-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Analyzing image against 46 CFR 107/108/109...
+                </div>
+            </div>
+
+            <!-- Analysis Output -->
+            <div id="analysis-output" class="bg-blue-50 p-4 rounded-lg border border-blue-200 min-h-[5rem]">
+                <p class="font-medium text-gray-700">Analysis will appear here after capture and will be automatically saved below.</p>
+            </div>
+
+            <button id="retake-photo" class="mt-4 bg-gray-500 text-white px-4 py-2 rounded-lg font-semibold w-full hover:bg-gray-600 transition duration-150 active:scale-95">
+                Retake Photo
+            </button>
+        </div>
+        
+        <!-- 3. Inspection History Table -->
+        <div id="history-container" class="mt-8 pt-4 border-t border-gray-200 hidden">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-xl font-bold text-blue-800">Inspection History (Shared)</h2>
+                <button id="email-history-btn" class="bg-gray-200 text-gray-700 text-sm px-3 py-1 rounded-full font-medium hover:bg-gray-300 transition duration-150">
+                    Email List
+                </button>
+            </div>
+            <div class="overflow-x-auto shadow-md rounded-lg">
+                <table class="min-w-full bg-white">
+                    <thead class="bg-blue-500 text-white">
+                        <tr>
+                            <th class="w-1/6 p-3 text-left text-xs font-semibold uppercase tracking-wider">Date/Time</th>
+                            <th class="w-1/12 p-3 text-left text-xs font-semibold uppercase tracking-wider">Image</th>
+                            <th class="w-4/6 p-3 text-left text-xs font-semibold uppercase tracking-wider">Issue Summary</th>
+                            <th class="w-1/12 p-3 text-left text-xs font-semibold uppercase tracking-wider">CFR</th>
+                            <th class="w-1/12 p-3 text-left text-xs font-semibold uppercase tracking-wider">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="divide-y divide-gray-200">
+                        <!-- Inspection records will be inserted here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </main>
+
+    <!-- Modal for Detailed View -->
+    <div id="details-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50 overflow-y-auto" onclick="this.classList.add('hidden')">
+        <div class="min-h-screen flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6" onclick="event.stopPropagation()">
+                <h3 class="text-2xl font-bold text-blue-900 mb-4 border-b pb-2">Inspection Record Details</h3>
+                <div class="md:flex gap-6">
+                    <div class="md:w-1/3 mb-4 md:mb-0">
+                        <p class="font-semibold mb-2">Captured Image:</p>
+                        <img id="modal-image" class="w-full h-auto object-contain rounded-lg border border-gray-300 shadow-md" alt="Captured Image">
+                    </div>
+                    <div class="md:w-2/3">
+                        <p class="font-semibold mb-2">Full Analysis Report:</p>
+                        <div id="modal-content-details" class="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto text-sm">
+                            <!-- Full analysis text will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 text-right">
+                    <button onclick="document.getElementById('details-modal').classList.add('hidden')" class="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Simple Alerts/Errors -->
+    <div id="alert-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50" onclick="this.classList.add('hidden')">
+        <div class="min-h-screen flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+                <h3 id="alert-modal-title" class="text-xl font-bold text-red-700 mb-3">Error</h3>
+                <p id="alert-modal-message" class="text-gray-700 mb-4">An error occurred.</p>
+                <div class="text-right">
+                    <button onclick="document.getElementById('alert-modal').classList.add('hidden')" class="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JavaScript and Firebase Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const apiKey = ""; // API key for Gemini
+
+        // Firebase Initialization (Mandatory setup for the environment)
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        
+        // Global State for Records
+        let inspectionRecords = [];
+
+        // DOM Elements
+        const videoFeed = document.getElementById('video-feed');
+        const captureCanvas = document.getElementById('capture-canvas');
+        const capturePhotoBtn = document.getElementById('capture-photo');
+        const startCameraBtn = document.getElementById('start-camera');
+        const imagePreview = document.getElementById('image-preview');
+        const analysisOutput = document.getElementById('analysis-output');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const cameraSection = document.getElementById('camera-section');
+        const resultsSection = document.getElementById('results-section');
+        const retakePhotoBtn = document.getElementById('retake-photo');
+        const emailHistoryBtn = document.getElementById('email-history-btn');
+
+        let videoStream = null;
+
+        // 1. Utility Functions
+        function showModal(title, message) {
+            const modal = document.getElementById('alert-modal');
+            document.getElementById('alert-modal-title').textContent = title;
+            document.getElementById('alert-modal-message').textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        // Utility to handle basic markdown formatting
+        function formatMarkdownToHtml(markdown) {
+            let html = markdown
+                .replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold mt-5 mb-3">$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-6 mb-4">$1</h1>')
+                .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+                .replace(/\*(.*)\*/gim, '<em>$1</em>');
+            
+            // Handle bulleted lists specifically for analysis
+            const listRegex = /^- (.*$)/gim;
+            if (html.match(listRegex)) {
+                 html = html.split('\n').map(line => {
+                    if (line.trim().startsWith('- ')) {
+                        return `<li>${line.substring(2).trim()}</li>`;
+                    }
+                    return line;
+                }).join('\n');
+                html = html.replace(/<\/li>\s*<li>/gim, '</li><li>');
+                html = html.replace(/(^|\n)(<li>.*<\/li>)(\n|$)/gim, '\n<ul>$2</ul>\n');
+            }
+            return html;
+        }
+
+        // 2. Initialize Firebase and Authenticate
+        async function initializeFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length > 0) {
+                    app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+                    setLogLevel('debug'); // Enable Firestore logging
+
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    userId = auth.currentUser?.uid || crypto.randomUUID();
+                    console.log("Firebase initialized. User ID:", userId);
+                    
+                    // Start listening to inspection history
+                    loadInspectionRecords();
+                } else {
+                    console.warn("Firebase config is empty. Proceeding without persistent storage.");
+                }
+            } catch (error) {
+                console.error("Firebase initialization or sign-in failed:", error);
+                showModal("Initialization Error", `Failed to initialize the app: ${error.message}. History will not be saved.`);
+            }
+        }
+
+        // 3. Camera Handling
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment' // Prefer rear camera on mobile
+                    }
+                };
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoFeed.srcObject = videoStream;
+
+                videoFeed.onloadedmetadata = () => {
+                    videoFeed.play();
+                    startCameraBtn.classList.add('hidden');
+                    capturePhotoBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    capturePhotoBtn.disabled = false;
+                };
+
+            } catch (err) {
+                analysisOutput.innerHTML = `<p class="text-red-600">Error accessing camera: ${err.message}. Please ensure permissions are granted.</p>`;
+                showModal("Camera Error", `Error accessing camera: ${err.message}. Please ensure permissions are granted.`);
+                console.error("Error accessing media devices.", err);
+            }
+        }
+
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+        }
+
+        function capturePhoto() {
+            if (!videoStream) return;
+
+            // Set canvas size to video size
+            captureCanvas.width = videoFeed.videoWidth;
+            captureCanvas.height = videoFeed.videoHeight;
+
+            // Draw the current frame of the video onto the canvas
+            const ctx = captureCanvas.getContext('2d');
+            ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
+
+            // Convert canvas content to base64 JPEG
+            const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.8);
+            const base64Image = dataUrl.split(',')[1];
+
+            // Update UI
+            stopCamera();
+            imagePreview.src = dataUrl;
+            cameraSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            analysisOutput.innerHTML = `<p class="font-medium text-gray-700">Image captured. Starting analysis...</p>`;
+
+            // Send to LLM for analysis
+            analyzeImage(base64Image, dataUrl);
+        }
+
+        // 4. Gemini API Interaction
+        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+
+        // Exponential backoff retry function
+        async function fetchWithRetry(url, options, retries = 5) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        if (response.status === 429 && i < retries - 1) { // Rate limit
+                            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        async function analyzeImage(base64Image, dataUrl) {
+            loadingIndicator.classList.remove('hidden');
+            analysisOutput.innerHTML = '';
+
+            // --- UPDATED SYSTEM PROMPT FOR HAZARD/NON-HAZARD DISTINCTION ---
+            const systemPrompt = `You are a highly experienced U.S. Coast Guard Marine Inspector. Your task is to analyze the provided image of maritime equipment, structure, or vessel space.
+
+            **PRIMARY DIRECTIVE:** Determine if the image contains any conditions that would likely result in a Form 835 (Notice of Violation/Deficiency) based on 46 CFR 107, 108, and 109 (Mobile Offshore Drilling Units - MODUs).
+
+            **Output Structure:**
+            
+            **A. IF DEFICIENCIES ARE FOUND (Hazard):**
+            1.  **Summary of Findings:** A brief statement of the overall condition (e.g., "Multiple structural deficiencies observed").
+            2.  **Deficiency List (Form 835 Items):** A bulleted list of potential deficiencies. For each item, state:
+                * The observed deficiency (e.g., 'Excessive corrosion on lifeline stanchion').
+                * The likely 46 CFR part and potential section violated (e.g., '46 CFR 108.401 (Structural Integrity)').
+                * A suggested severity/action (e.g., 'Required Repair (835)').
+            3.  **Recommendations:** General maintenance or compliance recommendations.
+            
+            **B. IF NO DEFICIENCIES ARE FOUND (Compliant/Non-Hazard):**
+            1.  **Summary of Findings:** State clearly and exactly: "No Deficiencies Found."
+            2.  **Deficiency List (Form 835 Items):** State: "The visual inspection indicates compliance with 46 CFR Subchapter I standards in the visible area."
+            3.  **Recommendations:** General best practices or maintenance recommendations.`;
+
+
+            const userQuery = "Analyze this image for any deficiencies that would warrant a Coast Guard Form 835, focusing on 46 CFR Subchapter I (MODUs).";
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: userQuery },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg",
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }
+                ],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                }
+            };
+
+            try {
+                const response = await fetchWithRetry(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "Error: Could not retrieve analysis. Check the console for details.";
+
+                if (text.startsWith("Error:")) {
+                    analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">${text}</div>`;
+                    showModal("Analysis Failed", "The Gemini API returned an error or an incomplete response.");
+                } else {
+                    analysisOutput.innerHTML = formatMarkdownToHtml(text);
+                    // Save the record after successful analysis
+                    saveInspectionRecord(dataUrl, text); 
+                }
+                
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">Analysis failed. API Error: ${error.message}. Please check your connection and configuration.</div>`;
+                showModal("API Error", `Analysis failed. API Error: ${error.message}.`);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        // 5. Firestore Operations
+        const INSPECTION_COLLECTION_PATH = `/artifacts/${appId}/public/data/inspections`;
+
+        async function saveInspectionRecord(dataUrl, analysisText) {
+            if (!db) {
+                console.error("Firestore not initialized. Cannot save record.");
+                return;
+            }
+
+            try {
+                // --- UPDATED LOGIC TO CHECK FOR NON-HAZARD (COMPLIANCE) ---
+                const isCompliant = analysisText.includes("No Deficiencies Found");
+
+                let summary;
+                let cfrRef;
+
+                if (isCompliant) {
+                    summary = "Compliant: No Violations Identified";
+                    cfrRef = "N/A - Compliant";
+                } else {
+                    // Existing extraction logic for deficiencies (Hazard)
+                    const summaryMatch = analysisText.match(/Summary of Findings:\s*(.*?)(?:\n\n|\n2\.\s*Deficiency List)/is);
+                    summary = summaryMatch ? summaryMatch[1].trim() : "Analysis summary unavailable.";
+                    
+                    // Try to find the first CFR reference, e.g., 108.401
+                    const cfrMatch = analysisText.match(/CFR (\d{3}\.\d+)/i);
+                    cfrRef = cfrMatch ? `46 CFR ${cfrMatch[1]}` : "CFR N/A";
+                }
+                // -----------------------------------------------------------
+
+                const docRef = await addDoc(collection(db, INSPECTION_COLLECTION_PATH), {
+                    userId: userId,
+                    timestamp: serverTimestamp(),
+                    dataUrl: dataUrl,
+                    summary: summary,
+                    cfrReference: cfrRef,
+                    fullAnalysis: analysisText // Store full text for details modal
+                });
+                console.log("Inspection record saved with ID: ", docRef.id);
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                showModal("Error Saving Record", `Could not save the inspection record to history: ${e.message}`);
+            }
+        }
+
+        function loadInspectionRecords() {
+            if (!db) return;
+
+            const q = query(
+                collection(db, INSPECTION_COLLECTION_PATH),
+                orderBy("timestamp", "desc")
+            );
+
+            // Set up real-time listener
+            onSnapshot(q, (querySnapshot) => {
+                const records = [];
+                querySnapshot.forEach((doc) => {
+                    records.push({ id: doc.id, ...doc.data() });
+                });
+                inspectionRecords = records; // Store records globally
+                renderInspectionTable(records);
+            }, (error) => {
+                console.error("Error loading inspection records: ", error);
+                showModal("Data Error", `Failed to load inspection history: ${error.message}`);
+            });
+        }
+        
+        // 6. Rendering History Table
+        function renderInspectionTable(records) {
+            const tableBody = document.getElementById('history-table-body');
+            const historyContainer = document.getElementById('history-container');
+            if (!tableBody) return;
+
+            if (records.length === 0) {
+                historyContainer.classList.add('hidden');
+                return;
+            }
+
+            historyContainer.classList.remove('hidden');
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            records.forEach(record => {
+                // Formatting date and time
+                const dateObj = record.timestamp?.toDate ? record.timestamp.toDate() : new Date();
+                const date = dateObj.toLocaleDateString();
+                const time = dateObj.toLocaleTimeString();
+                
+                // Truncate summary for table view
+                const displaySummary = record.summary.length > 50 
+                    ? record.summary.substring(0, 50) + '...' 
+                    : record.summary;
+
+                // --- UPDATED ROW STYLING BASED ON HAZARD/NON-HAZARD ---
+                const isCompliant = record.summary.startsWith("Compliant:");
+                
+                // Green for Compliant, default (white/hover) for Deficiencies
+                const rowClass = isCompliant 
+                    ? 'border-b hover:bg-green-50 bg-green-100/50' 
+                    : 'border-b hover:bg-gray-50';
+                
+                const cfrClass = isCompliant
+                    ? 'font-semibold text-green-700'
+                    : 'font-semibold text-red-700';
+                // -------------------------------------------------------
+
+                // Escape backticks in fullAnalysis for use in template string for the click handler
+                const safeFullAnalysis = record.fullAnalysis.replace(/`/g, '\\`');
+
+                const row = document.createElement('tr');
+                row.className = rowClass;
+                
+                row.innerHTML = `
+                    <td class="p-3 text-sm font-medium whitespace-nowrap">${date} <span class="text-gray-500 text-xs">${time}</span></td>
+                    <td class="p-3">
+                        <img src="${record.dataUrl}" alt="Inspection Image" class="w-16 h-12 object-cover rounded-md shadow cursor-pointer" 
+                            onclick="document.getElementById('modal-image').src='${record.dataUrl}'; 
+                                     document.getElementById('modal-content-details').innerHTML = formatMarkdownToHtml(\`${safeFullAnalysis}\`); 
+                                     document.getElementById('details-modal').classList.remove('hidden');">
+                    </td>
+                    <td class="p-3 text-sm text-gray-700">${displaySummary}</td>
+                    <td class="p-3 text-sm ${cfrClass} whitespace-nowrap">${record.cfrReference}</td>
+                    <td class="p-3">
+                        <button onclick="document.getElementById('modal-image').src='${record.dataUrl}'; 
+                                     document.getElementById('modal-content-details').innerHTML = formatMarkdownToHtml(\`${safeFullAnalysis}\`); 
+                                     document.getElementById('details-modal').classList.remove('hidden');" class="text-xs font-medium text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition">
+                            Details
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // 7. Email Handling
+        function emailHistory() {
+            if (inspectionRecords.length === 0) {
+                showModal("No Records", "There is no inspection history to email yet.");
+                return;
+            }
+
+            let bodyContent = "USCG Inspection Analyst Report\n\n";
+            // Create a simple text table header
+            bodyContent += "Date & Time          | Status        | CFR Ref     | Summary\n";
+            bodyContent += "--------------------------------------------------------------------------\n";
+
+            inspectionRecords.forEach(record => {
+                // Formatting date and time
+                const dateObj = record.timestamp?.toDate ? record.timestamp.toDate() : new Date();
+                const dateTime = dateObj.toLocaleTimeString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                // Determine status and clean up summary
+                const isCompliant = record.summary.startsWith("Compliant:");
+                const status = isCompliant ? "COMPLIANT" : "DEFICIENCY";
+                
+                // Keep the original summary for the email line item, truncate long ones
+                const summaryText = record.summary.replace(/Compliant: No Violations Identified/, 'Clean').replace(/\.\.\.$/, '').trim();
+                const shortSummary = summaryText.substring(0, 50) + (summaryText.length > 50 ? '...' : '');
+
+                const cfr = record.cfrReference || 'N/A';
+
+                // Append row data (using padding to help with alignment in plain text emails)
+                bodyContent += `${dateTime.padEnd(20)}| ${status.padEnd(14)}| ${cfr.padEnd(12)}| ${shortSummary}\n`;
+            });
+            
+            bodyContent += "\n\n---\nNote: Full analysis details and image evidence are available in the web application history.\n";
+
+            const subject = encodeURIComponent(`USCG Inspection Report (${new Date().toLocaleDateString()})`);
+            const body = encodeURIComponent(bodyContent);
+
+            // mailto link construction
+            const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
+
+            // Open the default email client
+            window.open(mailtoLink);
+        }
+
+
+        // 8. Event Listeners
+        startCameraBtn.addEventListener('click', startCamera);
+        capturePhotoBtn.addEventListener('click', capturePhoto);
+        emailHistoryBtn.addEventListener('click', emailHistory);
+
+        retakePhotoBtn.addEventListener('click', () => {
+            resultsSection.classList.add('hidden');
+            cameraSection.classList.remove('hidden');
+            startCameraBtn.classList.remove('hidden');
+            capturePhotoBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            capturePhotoBtn.disabled = true;
+            imagePreview.src = '';
+            analysisOutput.innerHTML = `<p class="font-medium text-gray-700">Analysis will appear here after capture.</p>`;
+        });
+
+        // Initial setup
+        initializeFirebase();
+
+    </script>
+</body>
+</html>
