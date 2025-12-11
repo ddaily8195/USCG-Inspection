@@ -149,11 +149,17 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, setLogLevel, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables provided by the environment
+        // Global variables provided by the Canvas environment (used for Firestore setup)
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        const apiKey = ""; // API key for Gemini
+        
+        // --- !!! ACTION REQUIRED FOR DIGITAL OCEAN DEPLOYMENT !!! ---
+        // Since you are deploying as a Static Site without a backend proxy (server.js),
+        // you MUST paste your Gemini API Key here for the application to function.
+        // WARNING: This key will be visible in the browser's source code.
+        const apiKey = "AIzaSyAsaY80_5lk2dWq2VMJLRSLaQGnrc1CX38"; // <-- PASTE YOUR GEMINI API KEY HERE 
+        // -----------------------------------------------------------
 
         // Firebase Initialization (Mandatory setup for the environment)
         let app;
@@ -297,7 +303,7 @@
             analyzeImage(base64Image, dataUrl);
         }
 
-        // 4. Gemini API Interaction
+        // 4. Gemini API Interaction (Reverting to direct client-side call)
         const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
@@ -307,11 +313,21 @@
                 try {
                     const response = await fetch(url, options);
                     if (!response.ok) {
-                        if (response.status === 429 && i < retries - 1) { // Rate limit
+                        if (response.status === 400 && i < retries - 1) { // 400 is often a content or format issue, not rate limit, but we'll retry few times just in case.
                             const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
                             await new Promise(resolve => setTimeout(resolve, delay));
                             continue;
                         }
+                        // Check for 401 Unauthorized (missing API key) or other critical errors
+                        if (response.status === 401 || response.status === 403 || response.status === 429) {
+                           let errorText = await response.text();
+                           try {
+                               const errorJson = JSON.parse(errorText);
+                               errorText = errorJson.error?.message || errorText;
+                           } catch (e) {}
+                           throw new Error(`API call failed (${response.status} - Unauthorized/Rate Limit): Ensure API Key is correct and billing is active. Details: ${errorText.substring(0, 100)}...`);
+                        }
+                        
                         throw new Error(`API call failed with status: ${response.status}`);
                     }
                     return response;
@@ -324,10 +340,20 @@
         }
 
         async function analyzeImage(base64Image, dataUrl) {
+            
+            // --- NEW CHECK ---
+            if (!apiKey) {
+                 console.error("Gemini API key is missing. Please set the apiKey variable in index.html.");
+                 analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">Authentication Error: Gemini API key is missing. Please paste your key into the 'apiKey' variable in the source code.</div>`;
+                 loadingIndicator.classList.add('hidden');
+                 return;
+            }
+            // --- END NEW CHECK ---
+
             loadingIndicator.classList.remove('hidden');
             analysisOutput.innerHTML = '';
 
-            // --- UPDATED SYSTEM PROMPT FOR HAZARD/NON-HAZARD DISTINCTION ---
+            // The frontend prepares the payload, including the system prompt
             const systemPrompt = `You are a highly experienced U.S. Coast Guard Marine Inspector. Your task is to analyze the provided image of maritime equipment, structure, or vessel space.
 
             **PRIMARY DIRECTIVE:** Determine if the image contains any conditions that would likely result in a Form 835 (Notice of Violation/Deficiency) based on 46 CFR 107, 108, and 109 (Mobile Offshore Drilling Units - MODUs).
@@ -371,6 +397,7 @@
             };
 
             try {
+                // Direct call to Gemini API using the API_URL with the embedded key
                 const response = await fetchWithRetry(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -378,11 +405,12 @@
                 });
 
                 const result = await response.json();
+                
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "Error: Could not retrieve analysis. Check the console for details.";
 
                 if (text.startsWith("Error:")) {
                     analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">${text}</div>`;
-                    showModal("Analysis Failed", "The Gemini API returned an error or an incomplete response.");
+                    showModal("Analysis Failed", "The model returned an error or an incomplete response.");
                 } else {
                     analysisOutput.innerHTML = formatMarkdownToHtml(text);
                     // Save the record after successful analysis
@@ -390,15 +418,15 @@
                 }
                 
             } catch (error) {
-                console.error("Gemini API Error:", error);
-                analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">Analysis failed. API Error: ${error.message}. Please check your connection and configuration.</div>`;
-                showModal("API Error", `Analysis failed. API Error: ${error.message}.`);
+                console.error("API Call Error:", error);
+                analysisOutput.innerHTML = `<div class="p-3 bg-red-100 text-red-700 rounded-lg">Analysis failed. API Call Error: ${error.message}.</div>`;
+                showModal("API Call Error", `Analysis failed. Error: ${error.message}.`);
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
         }
 
-        // 5. Firestore Operations
+        // 5. Firestore Operations (No change needed)
         const INSPECTION_COLLECTION_PATH = `/artifacts/${appId}/public/data/inspections`;
 
         async function saveInspectionRecord(dataUrl, analysisText) {
@@ -465,7 +493,7 @@
             });
         }
         
-        // 6. Rendering History Table
+        // 6. Rendering History Table (No change needed)
         function renderInspectionTable(records) {
             const tableBody = document.getElementById('history-table-body');
             const historyContainer = document.getElementById('history-container');
@@ -531,7 +559,7 @@
             });
         }
 
-        // 7. Email Handling
+        // 7. Email Handling (No change needed)
         function emailHistory() {
             if (inspectionRecords.length === 0) {
                 showModal("No Records", "There is no inspection history to email yet.");
@@ -596,4 +624,3 @@
     </script>
 </body>
 </html>
-
