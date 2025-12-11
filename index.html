@@ -369,24 +369,20 @@
             analysisOutput.innerHTML = '';
 
             // The frontend prepares the payload, including the system prompt
-            const systemPrompt = `You are a highly experienced U.S. Coast Guard Marine Inspector. Your task is to analyze the provided image of maritime equipment, structure, or vessel space.
+            const systemPrompt = `You are a U.S. Coast Guard Marine Inspector. Your task is to analyze the image and the provided user context to identify any violations related to 46 CFR 107, 108, and 109 (MODUs).
 
-            **PRIMARY DIRECTIVE:** Determine if the image contains any conditions that would likely result in a Form 835 (Notice of Violation/Deficiency) based on 46 CFR 107, 108, and 109 (Mobile Offshore Drilling Units - MODUs).
+            **CONCISENESS MANDATE:** ALL descriptions MUST be concise. Provide actionable summaries and direct references. DO NOT use overly descriptive or long paragraphs or recommendations.
 
             **Output Structure:**
             
             **A. IF DEFICIENCIES ARE FOUND (Hazard):**
-            1.  **Summary of Findings:** A brief statement of the overall condition (e.g., "Multiple structural deficiencies observed").
-            2.  **Deficiency List (Form 835 Items):** A bulleted list of potential deficiencies. For each item, state:
-                * The observed deficiency (e.g., 'Excessive corrosion on lifeline stanchion').
-                * The likely 46 CFR part and potential section violated (e.g., '46 CFR 108.401 (Structural Integrity)').
-                * A suggested severity/action (e.g., 'Required Repair (835)').
-            3.  **Recommendations:** General maintenance or compliance recommendations.
+            1.  **Summary of Findings:** A single, brief sentence summarizing the overall inspection.
+            2.  **Deficiency List (Form 835 Items):** A concise bulleted list of potential deficiencies. Format each bullet STRICTLY as follows:
+                * [Brief Observed Deficiency, e.g., Minor corrosion on safety rail] - [46 CFR Part/Section Violated, e.g., 46 CFR 108.401] - [Required Action/Solution, e.g., Clean and paint rail section]
             
             **B. IF NO DEFICIENCIES ARE FOUND (Compliant/Non-Hazard):**
             1.  **Summary of Findings:** State clearly and exactly: "No Deficiencies Found."
-            2.  **Deficiency List (Form 835 Items):** State: "The visual inspection indicates compliance with 46 CFR Subchapter I standards in the visible area."
-            3.  **Recommendations:** General best practices or maintenance recommendations.`;
+            2.  **Deficiency List (Form 835 Items):** State: "The visual inspection indicates compliance with 46 CFR Subchapter I standards in the visible area."`;
 
 
             // UPDATED: Append user context to the user query
